@@ -1,0 +1,2 @@
+# assistpy
+Use python effective
