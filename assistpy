@@ -83,8 +83,6 @@ try:
         exec(file.read())
 except (FileNotFoundError, IOError) as e:
     print(f"Error opening file '{extension_file_path}': {e}")
-except Exception as e:
-    print(e)
 
 
 
