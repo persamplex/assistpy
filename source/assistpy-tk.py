@@ -1,6 +1,5 @@
 import sys
 
-# Check Python version
 if sys.version_info >= (3, 13):
     print("This script requires Python version lower than 3.13.")
     sys.exit(1)
@@ -103,16 +102,17 @@ class AssistApp:
         keyboard.add_hotkey('ctrl+alt+.', lambda: self.queue.put('exit_app'))
 
     def toggle_assist_window(self):
-        if self.assist_window is None:
-            x, y = self.root.winfo_pointerxy()
-            self.create_assist_window(x, y)
-        else:
+        if self.assist_window and self.assist_window.winfo_exists():  # Check if the window exists
             self.assist_window.deiconify()
             self.assist_window.lift()
+        else:
+            x, y = self.root.winfo_pointerxy()
+            self.create_assist_window(x, y)
 
     def create_assist_window(self, x, y):
         self.assist_window = tk.Toplevel(self.root)
         self.assist_window.attributes('-alpha', 0.8)
+        self.assist_window.attributes('-topmost', True)
         self.assist_window.overrideredirect(True)
         self.assist_window.focus_force()
 
@@ -166,20 +166,22 @@ class AssistApp:
         
         try:
             self.entry.config(bg="white")
+
+            self.assist_window.withdraw()  # Option to hide the window instead of destroying
+            
             result = eval(command)
             if callable(result):
                 result()
-
                 self.notify_and_log(f"{command} executed with no arguments", result)
             else:
                 self.notify_and_log(f"{command} executed with result", result)
-
             self.assist_window.destroy()
-            self.assist_window = None
+
         except Exception as e:
             self.entry.config(fg="red")
+            self.assist_window.deiconify()  # Show the window again if there's an error
             self.notify_and_log(f"Error executing '{command}': {e}", is_error=True)
-
+        
     def notify_and_log(self, message, result=None, is_error=False):
         title = "Command Executed" if not is_error else "Execution Error"
         if config['showNotification']:
@@ -214,7 +216,10 @@ def is_workstation_locked():
         print(f'Error on is_workstation_locked: {e}')
 
 def icon_run(queue):
-    menu = Menu(MenuItem('Exit', lambda _: queue.put('exit_app')))
+    menu = Menu(
+        MenuItem('Reload', lambda _: queue.put('reload_app')),
+        MenuItem('Exit', lambda _: queue.put('exit_app'))
+    )
     current_file_path = os.path.abspath(__file__)
     current_directory = os.path.dirname(current_file_path)
     image = Image.open(os.path.join(current_directory,'icon.ico'))
@@ -261,6 +266,13 @@ def monitor_workstation(queue):
                     terminate_process(app_pid)
                     terminate_process(icon_pid)
                 break
+            elif msg == 'reload_app':
+                print('reload requested, stopping program...')
+                terminate_process(app_pid)
+                terminate_process(icon_pid)
+                print('reload requested, starting program...')
+                app_pid,icon_pid = launch_program(queue)
+                
 
         current_state = is_workstation_locked()
         if current_state != last_state:
